@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="max-age=86400">
+  <meta http-equiv="Expires" content="86400">
+  <title>Tennis Pose Analyzer</title>
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/loading.css">
+  <!-- TensorFlow.js core library -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0"></script>
+  <!-- Pose estimation model library -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.0.0"></script>
+</head>
+<body>
+  <header>
+    <h1>Tennis Pose Analyzer</h1>
+    <p>TensorFlow.js based real-time body movement visualization system</p>
+  </header>
+  
+  <main>
+    <div class="input-section">
+      <input type="file" id="video-upload" accept="video/*">
+      <label for="video-upload" class="control-btn">Upload Video</label>
+      <div class="stroke-selection">
+        <label>Stroke to analyze:</label>
+        <select id="stroke-type">
+          <option value="auto">Auto Detect</option>
+          <option value="forehand">Forehand</option>
+          <option value="backhand">Backhand</option>
+          <option value="serve">Serve</option>
+          <option value="volley">Volley</option>
+        </select>
+      </div>
+      <button id="toggle-visualization" class="control-btn">Toggle Motion Analysis Display</button>
+    </div>
+    
+    <div class="display-container">
+      <div class="video-container">
+        <video id="video" playsinline></video>
+        <canvas id="output-canvas"></canvas>
+        <div id="loading" class="loading-container hidden">
+          <div class="spinner"></div>
+          <p>Loading model...</p>
+          <div class="progress-container">
+            <div id="loading-progress-bar" class="progress-bar"></div>
+          </div>
+        </div>
+        
+        <div id="video-controls" class="video-controls hidden">
+          <div class="timeline-container">
+            <input type="range" id="timeline-slider" class="timeline-slider" min="0" max="100" value="0" step="0.1">
+            <div class="time-display">
+              <span id="current-time">0:00</span> / <span id="total-time">0:00</span>
+            </div>
+          </div>
+          <div class="control-buttons">
+            <button id="rewind-btn" class="video-control-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M11 18V6l-8.5 6 8.5 6zm.5-6l8.5 6V6l-8.5 6z"/>
+              </svg>
+            </button>
+            <button id="play-pause-btn" class="video-control-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+            </button>
+            <button id="forward-btn" class="video-control-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z"/>
+              </svg>
+            </button>
+            <div class="volume-control">
+              <button id="mute-btn" class="video-control-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                </svg>
+              </button>
+              <input type="range" id="volume-slider" class="volume-slider" min="0" max="1" step="0.01" value="1">
+            </div>
+            <div class="speed-control">
+              <button id="speed-btn" class="video-control-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                  <path d="M10 8v8l6-4-6-4zm10 0.28c0.74 0.48 1.42 1.05 2 1.72v-8h-18v14h18v-8c-0.58 0.67-1.26 1.24-2 1.72v-1.44z"/>
+                </svg>
+              </button>
+              <select id="playback-speed">
+                <option value="0.25">0.25x</option>
+                <option value="0.5">0.5x</option>
+                <option value="0.75">0.75x</option>
+                <option value="1" selected>1x</option>
+                <option value="1.5">1.5x</option>
+                <option value="2">2x</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="analysis-container">
+        <h2>Movement Data</h2>
+        <div id="analysis-result">
+          <!-- Analysis results will be displayed here -->
+          <p class="placeholder">Upload a video to analyze body movements.</p>
+        </div>
+        <div id="score-display" class="hidden">
+          <h3>Motion Accuracy</h3>
+          <div class="score-meter-container">
+            <div class="score-meter">
+              <div id="score-bar" class="score-bar"></div>
+              <span id="score-value">0</span><span>/100</span>
+            </div>
+            <div class="score-info">
+              <i class="info-icon" title="Motion accuracy is calculated by comparing with professional tennis players' movements. It comprehensively evaluates various factors including pose accuracy, movement flow, stability, and speed.">i</i>
+            </div>
+          </div>
+          <div class="score-legend">
+            <div class="legend-item">
+              <span class="legend-color" style="background-color: #e74c3c;"></span>
+              <span class="legend-label">Needs Improvement (0-30)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background-color: #e67e22;"></span>
+              <span class="legend-label">Basic (30-50)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background-color: #f39c12;"></span>
+              <span class="legend-label">Intermediate (50-70)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background-color: #27ae60;"></span>
+              <span class="legend-label">Advanced (70-85)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-color" style="background-color: #2ecc71;"></span>
+              <span class="legend-label">Professional (85-100)</span>
+            </div>
+          </div>
+        </div>
+        <div id="current-stroke-display" class="hidden">
+          <h3>Detected Stroke</h3>
+          <div class="detected-stroke">
+            <span id="current-stroke-value">None</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  
+  <footer>
+    <p> 2025 Tennis Pose Analyzer | <a href="https://github.com/your-username/tennis-pose-analyzer" target="_blank">GitHub</a></p>
+  </footer>
+
+  <!-- Script for model loading optimization -->
+  <script>
+    // Model performance optimization settings
+    if (window.tf) {
+      console.log('Applying TensorFlow.js optimization settings');
+      
+      // WebGL backend optimization settings
+      tf.setBackend('webgl').then(() => {
+        console.log('WebGL backend initialization complete');
+        
+        // GPU memory management optimization
+        if (tf.ENV.features['WEBGL_VERSION'] >= 2) {
+          console.log('WebGL 2.0 support confirmed');
+          tf.env().set('WEBGL_FORCE_F16_TEXTURES', true);
+        }
+        
+        // Additional performance optimization settings
+        tf.env().set('WEBGL_PACK', true);
+        tf.env().set('WEBGL_FLUSH_THRESHOLD', 1);
+        tf.env().set('CHECK_COMPUTATION_FOR_ERRORS', false);
+        tf.env().set('WEBGL_CPU_FORWARD', false);
+        tf.env().set('KEEP_INTERMEDIATE_TENSORS', false);
+        
+        // Worker count optimization
+        if (navigator.hardwareConcurrency) {
+          const optimalWorkers = Math.min(navigator.hardwareConcurrency - 1, 4);
+          if (optimalWorkers > 0) {
+            tf.env().set('WEBGL_NUM_THREADS', optimalWorkers);
+          }
+        }
+      });
+      
+      // Browser memory usage optimization
+      window.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+          // Clean up memory when page is hidden
+          if (tf && tf.disposeVariables) {
+            tf.engine().endScope();
+            tf.engine().disposeVariables();
+            console.log('TensorFlow.js memory cleanup performed');
+          }
+        }
+      });
+    }
+  </script>
+
+  <!-- JavaScript files -->
+  <script src="js/utils.js"></script>
+  <script src="js/poseDetector.js"></script>
+  <script src="js/tennisAnalyzer.js"></script>
+  <script src="js/visualizer.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
