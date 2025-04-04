@@ -73,7 +73,6 @@ A real-time tennis body movement visualization web application using TensorFlow.
   - `tennisAnalyzer.js`: Tennis pose movement data collection module
   - `visualizer.js`: Visualization module
   - `utils.js`: Utility functions
-- `assets/`: Images and reference materials
 
 ## Future Improvements
 
